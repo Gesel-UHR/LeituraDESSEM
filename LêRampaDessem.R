@@ -1,0 +1,54 @@
+library(tidyverse)
+#library(readxl)
+ArqRampa <- "/home/gabriel/Downloads/rampas.dat"
+
+
+# Funções -----------------------------------------------------------------
+LêRampas <- function(ArqRampa) {
+  #Larguras e nomes das colunas 
+  widths <- list(begin = c(0L, 4L, 8L, 13L, 17L, 20L, 31L, 37L), 
+                 end = c(3L, 7L, 11L, 14L, 18L, 30L, 36L, NA), 
+                 col_names = c("Número", "Unidade", "Seg", "C", "T", "Potência", "Hora", "Meia-hora"))
+  # Carrega o arquivo
+  lin <- read_lines(ArqRampa)
+  # # Pega os nomes das Usinas
+  InicUsina <- c(1, which(c(lin == "&", FALSE) & c(FALSE, lin == "&")))
+  IdUsinas <- lin[InicUsina + 1] %>% str_split("-", simplify = TRUE) %>% as_tibble(.name_repair = "unique")
+  IdUsinas <- bind_cols(InicUsina + 1, IdUsinas)
+  colnames(IdUsinas) <- c("LinhaI", "Número", "Nome")
+  IdUsinas <- IdUsinas %>% filter(Nome != "") %>% separate(Número, into = c(NA, "Número")) %>% 
+    mutate(Número = as.integer(Número)) %>% mutate(LinhaF = lead(LinhaI) - 1, .after = LinhaI) 
+  IdUsinas[nrow(IdUsinas), "LinhaF"] <- length(lin)
+  # Carrega os dados
+  Rampas <- read_fwf(I(lin), 
+                     col_positions = widths, col_types = "iiiccdii") %>% drop_na(Número)
+  # Preenche valores vazios na coluna Meia-hora.
+  Rampas <- Rampas %>% replace_na(list(`Meia-hora` = 0))
+  # Adiciona linhas com a hora 0.
+  Rampas <- bind_rows(Rampas, 
+                      Rampas %>% distinct(Número, Unidade, Seg, C) %>% 
+                        mutate(T = "A", Potência = 0, Hora = 0, `Meia-hora` = 0), 
+                      Rampas %>% distinct(Número, Unidade, Seg, C) %>% 
+                        mutate(T = "D", Hora = 0, `Meia-hora` = 0)
+  ) %>% left_join(Rampas %>% group_by(Número, Unidade, Seg, C) %>% 
+                    summarise(PotMax = max(Potência))) %>% 
+    mutate(Potência = coalesce(Potência, PotMax)) %>% select(-PotMax) %>% 
+    arrange(Número, Unidade, T, Hora, `Meia-hora`)
+  
+  Rampas <- Rampas %>% group_by(Número, Unidade, Seg, C, T) %>% 
+    mutate(Tempo = Hora + `Meia-hora` * 0.5, Rampa = (lead(Potência) - Potência) / (lead(Tempo) - Tempo),
+           RampaMédia = (last(Potência) - first(Potência)) / (last(Tempo) - first(Tempo)))
+  # Junta tabelas
+  left_join(IdUsinas %>% select(Número, Nome), Rampas %>% select(!any_of(c("Hora", "Meia-hora"))))
+}
+
+# Comandos ----------------------------------------------------------------
+Rampas <- LêRampas(ArqRampa)
+
+# Valor único por usina
+ValMédios <- Rampas %>% group_by(Número, Nome, Unidade, Seg, T) %>% 
+  summarise(RampaMédia = mean(RampaMédia)) %>% ungroup() %>% 
+  select(Nome, Unidade, T, RampaMédia) %>% 
+  mutate(T = case_when(T == "A" ~ "RampUp",
+                       T == "D" ~ "RampDown"))
+write_excel_csv(ValMédios, "~/Downloads/saidarampa.csv")
