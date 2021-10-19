@@ -49,17 +49,18 @@ Rampas <- LêRampas(ArqRampa) %>% drop_na()
 ValMédios <- Rampas %>% group_by(Número, Nome, Unidade, Seg, T) %>% 
   summarise(RampaMédia = mean(RampaMédia)) %>% ungroup() %>% 
   select(Nome, Unidade, T, RampaMédia) %>% 
-  mutate(T = case_when(T == "A" ~ "RampUp",
-                       T == "D" ~ "RampDown"))
+  mutate(T = case_when(T == "A" ~ "Max Ramp Up",
+                       T == "D" ~ "Max Ramp Down"))
 write_excel_csv2(ValMédios, ArqSaídaMédia)
 
 ValDetalhados <- Rampas %>% select(Nome, Unidade, T, Potência, Rampa) %>% 
+  group_by(Nome, T) %>% mutate(Band = row_number()) %>% 
   pivot_longer(c(Potência, Rampa)) %>% 
   mutate(T = case_when(T == "A" ~ "Up",
                        T == "D" ~ "Down"),
-         name = case_when(name == "Potência" ~ "Point",
-                          name == "Rampa" ~ "Value"),
-         name = paste0(name, " ", T)) %>% select(-T)
+         name = case_when(name == "Potência" ~ paste0("Ramp ", T, " Point"),
+                          name == "Rampa" ~ paste0("Max Ramp ", T))) %>% 
+  ungroup() %>% select(-T)
 write_excel_csv2(ValDetalhados, ArqSaídaDetal)
 
 
