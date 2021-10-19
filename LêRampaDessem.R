@@ -1,8 +1,8 @@
 library(tidyverse)
-#library(readxl)
-ArqRampa <- "/home/gabriel/Downloads/rampas.dat"
-
-
+ArqRampa <- "rampas.dat"
+ArqSaídaMédia <- "SaiMed.csv"
+ArqSaídaDetal <- "SaiDet.csv"
+  
 # Funções -----------------------------------------------------------------
 LêRampas <- function(ArqRampa) {
   #Larguras e nomes das colunas 
@@ -43,7 +43,7 @@ LêRampas <- function(ArqRampa) {
 }
 
 # Comandos ----------------------------------------------------------------
-Rampas <- LêRampas(ArqRampa)
+Rampas <- LêRampas(ArqRampa) %>% drop_na()
 
 # Valor único por usina
 ValMédios <- Rampas %>% group_by(Número, Nome, Unidade, Seg, T) %>% 
@@ -51,4 +51,15 @@ ValMédios <- Rampas %>% group_by(Número, Nome, Unidade, Seg, T) %>%
   select(Nome, Unidade, T, RampaMédia) %>% 
   mutate(T = case_when(T == "A" ~ "RampUp",
                        T == "D" ~ "RampDown"))
-write_excel_csv(ValMédios, "~/Downloads/saidarampa.csv")
+write_excel_csv2(ValMédios, ArqSaídaMédia)
+
+ValDetalhados <- Rampas %>% select(Nome, Unidade, T, Potência, Rampa) %>% 
+  pivot_longer(c(Potência, Rampa)) %>% 
+  mutate(T = case_when(T == "A" ~ "Up",
+                       T == "D" ~ "Down"),
+         name = case_when(name == "Potência" ~ "Point",
+                          name == "Rampa" ~ "Value"),
+         name = paste0(name, " ", T)) %>% select(-T)
+write_excel_csv2(ValDetalhados, ArqSaídaDetal)
+
+
