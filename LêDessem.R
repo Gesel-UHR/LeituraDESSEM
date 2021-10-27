@@ -47,17 +47,19 @@ Rampas <- LêRampas(ArqRampa)
 # Faz a média das unidades de cada usina
 Rampas <- Rampas %>% drop_na() %>% group_by(Número, Nome, Seg, T, Potência, Tempo) %>% 
   summarise(Rampa = mean(Rampa), RampaMédia = mean(RampaMédia)) %>% 
-  mutate(Rampa = abs(Rampa), RampaMédia = abs(RampaMédia)) # Valores sempre podsitivos
+  mutate(Rampa = abs(Rampa / 60), RampaMédia = abs(RampaMédia / 60)) # Valores sempre positivos. Divididos por 60 para converter de hora para minuto.
 
 # Valor único por usina
 ValMédios <- Rampas %>% group_by(Número, Nome, Seg, T) %>% 
-  summarise(RampaMédia = mean(RampaMédia)) %>% ungroup() %>% 
-  select(Nome, T, RampaMédia) %>% 
+  summarise(RampaMédia = round(mean(RampaMédia), 4)) %>% ungroup() %>% 
+  select(Número, Nome, T, RampaMédia) %>% 
   mutate(T = case_when(T == "A" ~ "Max Ramp Up",
-                       T == "D" ~ "Max Ramp Down"))
+                       T == "D" ~ "Max Ramp Down")) %>% 
+  pivot_wider(c("Número", "Nome"), names_from = "T", values_from = "RampaMédia")
 write_csv2(ValMédios, ArqSaídaMédia)
 
-ValDetalhados <- Rampas %>% select(Nome, T, Potência, Rampa) %>% 
+ValDetalhados <- Rampas %>% select(Número, Nome, T, Potência, Rampa) %>% 
+  mutate(Rampa = round(Rampa, 4)) %>% 
   group_by(Nome, T) %>% mutate(Band = row_number()) %>% 
   pivot_longer(c(Potência, Rampa)) %>% 
   mutate(T = case_when(T == "A" ~ "Up",
@@ -65,6 +67,6 @@ ValDetalhados <- Rampas %>% select(Nome, T, Potência, Rampa) %>%
          name = case_when(name == "Potência" ~ paste0("Ramp ", T, " Point"),
                           name == "Rampa" ~ paste0("Max Ramp ", T))) %>% 
   ungroup() %>% select(-T)
-write_csv2(ValDetalhados, ArqSaídaDetal)
+write_csv2(ValDetalhados %>% mutate(value = as.character(value) %>% str_replace("\\.", ",")), ArqSaídaDetal)
 
 
