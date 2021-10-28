@@ -21,7 +21,8 @@ LêRampas <- function(ArqRampa) {
     mutate(Número = as.integer(Número)) %>% mutate(LinhaF = lead(LinhaI) - 1, .after = LinhaI) 
   IdUsinas[nrow(IdUsinas), "LinhaF"] <- length(lin)
   # Carrega os dados
-  Rampas <- read_fwf(I(lin), 
+  # Retira a primeira linha (RAMP) e as linhas que começam com "&"
+  Rampas <- read_fwf(I(lin %>% str_subset("^&", negate = TRUE) %>% str_subset("RAMP", negate = TRUE)), 
                      col_positions = widths, col_types = "iiiccdii") %>% drop_na(Número)
   # Preenche valores vazios na coluna Meia-hora.
   Rampas <- Rampas %>% replace_na(list(`Meia-hora` = 0))
@@ -48,7 +49,8 @@ Rampas <- LêRampas(ArqRampa)
 # Faz a média das unidades de cada usina
 Rampas <- Rampas %>% drop_na() %>% group_by(Número, Nome, Seg, T, Potência, Tempo) %>% 
   summarise(Rampa = mean(Rampa), RampaMédia = mean(RampaMédia)) %>% 
-  mutate(Rampa = abs(Rampa / 60), RampaMédia = abs(RampaMédia / 60)) # Valores sempre positivos. Divididos por 60 para converter de hora para minuto.
+  mutate(Rampa = abs(Rampa / 60), RampaMédia = abs(RampaMédia / 60)) %>%  # Valores sempre positivos. Divididos por 60 para converter de hora para minuto.
+  ungroup()
 
 # Valor único por usina
 ValMédios <- Rampas %>% group_by(Número, Nome, Seg, T) %>% 
@@ -61,7 +63,8 @@ write_csv2(ValMédios, ArqSaídaMédia)
 
 ValDetalhados <- Rampas %>% select(Número, Nome, T, Potência, Rampa) %>% 
   mutate(Rampa = round(Rampa, 4)) %>% 
-  group_by(Nome, T) %>% mutate(Band = row_number()) %>% 
+  group_by(Nome, T) %>% mutate(Band = row_number()) %>%
+  filter(Rampa != 0) %>% # A rampa não pode ser 0. 
   pivot_longer(c(Potência, Rampa)) %>% 
   mutate(T = case_when(T == "A" ~ "Up",
                        T == "D" ~ "Down"),
