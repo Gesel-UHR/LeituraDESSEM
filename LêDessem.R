@@ -6,8 +6,9 @@ ArqSaídaDetal <- "SaiDet.csv"
 # Funções -----------------------------------------------------------------
 LêRampas <- function(ArqRampa) {
   #Larguras e nomes das colunas 
-  widths <- list(begin = c(0L, 4L, 8L, 13L, 17L, 20L, 31L, 37L), 
-                 end = c(3L, 7L, 11L, 14L, 18L, 30L, 36L, NA), 
+  widths <- list(begin = c(1L, 5L, 9L, 14L, 18L, 21L, 32L, 38L) - 1,
+                 # Pelo manual, o campo Potência é só até a coluna 30, mas tem usina que está usando a 31.
+                 end = c(3L, 7L, 11L, 14L, 18L, 31L, 36L, 38L),
                  col_names = c("Número", "Unidade", "Seg", "C", "T", "Potência", "Hora", "Meia-hora"))
   # Carrega o arquivo
   lin <- read_lines(ArqRampa)
