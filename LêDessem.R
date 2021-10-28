@@ -28,16 +28,16 @@ LêRampas <- function(ArqRampa) {
   Rampas <- Rampas %>% replace_na(list(`Meia-hora` = 0))
   # Adiciona linhas com a hora 0.
   Rampas <- bind_rows(Rampas, 
-                      Rampas %>% distinct(Número, Unidade, Seg, C) %>% 
+                      Rampas %>% distinct(Número, Unidade, C) %>% 
                         mutate(T = "A", Potência = 0, Hora = 0, `Meia-hora` = 0), 
-                      Rampas %>% distinct(Número, Unidade, Seg, C) %>% 
+                      Rampas %>% distinct(Número, Unidade, C) %>% 
                         mutate(T = "D", Hora = 0, `Meia-hora` = 0)
-  ) %>% left_join(Rampas %>% group_by(Número, Unidade, Seg, C) %>% 
+  ) %>% left_join(Rampas %>% group_by(Número, Unidade, C) %>% 
                     summarise(PotMax = max(Potência))) %>% 
     mutate(Potência = coalesce(Potência, PotMax)) %>% select(-PotMax) %>% 
     arrange(Número, Unidade, T, Hora, `Meia-hora`)
   
-  Rampas <- Rampas %>% group_by(Número, Unidade, Seg, C, T) %>% 
+  Rampas <- Rampas %>% group_by(Número, Unidade, C, T) %>% 
     mutate(Tempo = Hora + `Meia-hora` * 0.5, Rampa = (lead(Potência) - Potência) / (lead(Tempo) - Tempo),
            RampaMédia = (last(Potência) - first(Potência)) / (last(Tempo) - first(Tempo)))
   # Junta tabelas
@@ -47,13 +47,13 @@ LêRampas <- function(ArqRampa) {
 # Rotina principal ----------------------------------------------------------------
 Rampas <- LêRampas(ArqRampa)
 # Faz a média das unidades de cada usina
-Rampas <- Rampas %>% drop_na() %>% group_by(Número, Nome, Seg, T, Potência, Tempo) %>% 
+Rampas <- Rampas %>% drop_na() %>% group_by(Número, Nome, T, Potência, Tempo) %>% 
   summarise(Rampa = mean(Rampa), RampaMédia = mean(RampaMédia)) %>% 
   mutate(Rampa = abs(Rampa / 60), RampaMédia = abs(RampaMédia / 60)) %>%  # Valores sempre positivos. Divididos por 60 para converter de hora para minuto.
   ungroup()
 
 # Valor único por usina
-ValMédios <- Rampas %>% group_by(Número, Nome, Seg, T) %>% 
+ValMédios <- Rampas %>% group_by(Número, Nome, T) %>% 
   summarise(RampaMédia = round(mean(RampaMédia), 4)) %>% ungroup() %>% 
   select(Número, Nome, T, RampaMédia) %>% 
   mutate(T = case_when(T == "A" ~ "Max Ramp Up",
